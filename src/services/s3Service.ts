@@ -1,3 +1,5 @@
+import { supabase } from './supabaseClient'
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 export async function fetchLogs(): Promise<string[]> {
@@ -16,4 +18,12 @@ export async function uploadLog(file: File): Promise<void> {
   })
 
   if (!response.ok) throw new Error('Failed to upload log')
+
+  await supabase.from('log_files').insert([{
+    file_name: file.name,
+    file_path: `logs/${file.name}`,
+    file_size: file.size,
+    source_device: null,
+    metadata: {}
+  }])
 }
