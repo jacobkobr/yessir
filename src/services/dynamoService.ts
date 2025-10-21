@@ -1,23 +1,51 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
+import { DynamoDBDocumentClient, GetCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
 
 interface StateData {
   [key: string]: string
 }
 
+const getDynamoClient = () => {
+  const client = new DynamoDBClient({
+    region: import.meta.env.VITE_AWS_REGION,
+    credentials: {
+      accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+      secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY
+    }
+  })
+  return DynamoDBDocumentClient.from(client)
+}
+
 export async function getState(): Promise<StateData> {
-  const response = await fetch(`${API_BASE_URL}/state`)
-  if (!response.ok) throw new Error('Failed to fetch state')
-  return response.json()
+  const client = getDynamoClient()
+  const tableName = import.meta.env.VITE_AWS_DYNAMODB_TABLE
+
+  try {
+    const command = new GetCommand({
+      TableName: tableName,
+      Key: { id: 'app-state' }
+    })
+    const response = await client.send(command)
+    return response.Item?.state || {}
+  } catch (error) {
+    throw new Error('Failed to fetch state: ' + (error as Error).message)
+  }
 }
 
 export async function updateState(state: StateData): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/state`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(state)
-  })
+  const client = getDynamoClient()
+  const tableName = import.meta.env.VITE_AWS_DYNAMODB_TABLE
 
-  if (!response.ok) throw new Error('Failed to update state')
+  try {
+    const command = new PutCommand({
+      TableName: tableName,
+      Item: {
+        id: 'app-state',
+        state: state
+      }
+    })
+    await client.send(command)
+  } catch (error) {
+    throw new Error('Failed to update state: ' + (error as Error).message)
+  }
 }
